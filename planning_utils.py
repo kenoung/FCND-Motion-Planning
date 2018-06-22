@@ -8,6 +8,28 @@ def create_grid(data, drone_altitude, safety_distance):
     Returns a grid representation of a 2D configuration space
     based on given obstacle data, drone altitude and safety distance
     arguments.
+
+    Parameters
+    ----------
+    data : 2D numpy array
+    Data parsed from colliders.csv.
+
+    drone_altitude : numeric value (int or float)
+    Height of the drone. Obstacles below this height will be ignored.
+
+    safety_distance : numeric value (int or float)
+    Minimum distance allowed between drone and obstacle.
+
+    Returns
+    -------
+    grid : 2D numpy array
+    2D array of values containing only 1s and 0s, where 1s indicate no-go zones.
+
+    north_min : int
+    Minimum north coordinate.
+
+    east_min : int
+    Minimum east coordinate.
     """
 
     # minimum and maximum north coordinates
@@ -89,6 +111,23 @@ def valid_actions(grid, current_node):
 
 
 def a_star(grid, h, start, goal):
+    """
+    Returns a path and its associated cost by using A* search.
+
+    Parameters
+    ----------
+    grid : 2D array
+    Grid generated using create_grid function. Points marked 1 represent areas that the drone cannot enter.
+
+    h : function
+    Heuristic function that takes in two coordinates and returns the cost of travelling between them
+
+    start : tuple of 2 elements
+    Start coordinate
+
+    end : tuple of 2 elements
+    End coordinate
+    """
 
     path = []
     path_cost = 0
