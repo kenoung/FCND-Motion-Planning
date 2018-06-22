@@ -11,6 +11,8 @@ from udacidrone.connection import MavlinkConnection
 from udacidrone.messaging import MsgID
 from udacidrone.frame_utils import global_to_local
 
+from bresenham import bresenham
+
 
 class States(Enum):
     MANUAL = auto()
@@ -20,6 +22,19 @@ class States(Enum):
     LANDING = auto()
     DISARMING = auto()
     PLANNING = auto()
+
+
+def prune_path(path, grid):
+    if len(path) < 3:
+        return path
+
+    first, third = path[0], path[2]
+    for pt in bresenham(int(first[0]), int(first[1]), int(third[0]), int(third[1])):
+        count = 0
+        if grid[pt[0], pt[1]]:
+            return path[:1] + prune_path(path[1:], grid)
+
+    return prune_path(path[:1] + path[2:], grid)
 
 
 class MotionPlanning(Drone):
@@ -43,7 +58,10 @@ class MotionPlanning(Drone):
     def local_position_callback(self):
         if self.flight_state == States.TAKEOFF:
             if -1.0 * self.local_position[2] > 0.95 * self.target_position[2]:
-                self.waypoint_transition()
+                if self.waypoints:
+                    self.waypoint_transition()
+                else:
+                    self.landing_transition()
         elif self.flight_state == States.WAYPOINT:
             if np.linalg.norm(self.target_position[0:2] - self.local_position[0:2]) < 1.0:
                 if len(self.waypoints) > 0:
@@ -55,7 +73,7 @@ class MotionPlanning(Drone):
     def velocity_callback(self):
         if self.flight_state == States.LANDING:
             if self.global_position[2] - self.global_home[2] < 0.1:
-                if abs(self.local_position[2]) < 0.01:
+                if abs(self.local_position[2]) < 0.1:
                     self.disarming_transition()
 
     def state_callback(self):
@@ -119,28 +137,32 @@ class MotionPlanning(Drone):
 
         self.target_position[2] = TARGET_ALTITUDE
 
-        # TODO: read lat0, lon0 from colliders into floating point values
-        
-        # TODO: set home position to (lon0, lat0, 0)
+        with open('colliders.csv', 'r') as f:
+            _, lat0, _, lon0 = f.readline().replace(',', ' ').split()
+            lat0, lon0 = float(lat0), float(lon0)
+            self.set_home_position(lon0, lat0, 0)
 
-        # TODO: retrieve current global position
- 
-        # TODO: convert to current local position using global_to_local()
-        
+        curr_global_position = self.global_position
+        curr_local_position = global_to_local(curr_global_position, self.global_home)
+
         print('global home {0}, position {1}, local position {2}'.format(self.global_home, self.global_position,
                                                                          self.local_position))
         # Read in obstacle map
         data = np.loadtxt('colliders.csv', delimiter=',', dtype='Float64', skiprows=2)
         
         # Define a grid for a particular altitude and safety margin around obstacles
-        grid, north_offset, east_offset = create_grid(data, TARGET_ALTITUDE, SAFETY_DISTANCE)
+        grid, north_offset, east_offset = create_grid(data, TARGET_ALTITUDE, 0)
         print("North offset = {0}, east offset = {1}".format(north_offset, east_offset))
         # Define starting point on the grid (this is just grid center)
-        grid_start = (-north_offset, -east_offset)
+
+        grid_start = int(curr_local_position[0])-north_offset, int(curr_local_position[1])-east_offset
         # TODO: convert start position to current position rather than map center
         
         # Set goal as some arbitrary position on the grid
-        grid_goal = (-north_offset + 10, -east_offset + 10)
+        goal_geo = -122.3974511, 37.792
+        temp_goal = list(map(int, global_to_local(goal_geo + (0,), self.global_home)))
+        print("temp goal: ", temp_goal)
+        grid_goal = (100, 0) #north_offset - temp_goal[0], east_offset - temp_goal[1] #north_offset, east_offset
         # TODO: adapt to set goal as latitude / longitude position and convert
 
         # Run A* to find a path from start to goal
@@ -148,7 +170,10 @@ class MotionPlanning(Drone):
         # or move to a different search space such as a graph (not done here)
         print('Local Start and Goal: ', grid_start, grid_goal)
         path, _ = a_star(grid, heuristic, grid_start, grid_goal)
+
         # TODO: prune path to minimize number of waypoints
+        path = prune_path(path, grid)
+
         # TODO (if you're feeling ambitious): Try a different approach altogether!
 
         # Convert path to waypoints
