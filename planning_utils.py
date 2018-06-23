@@ -8,6 +8,28 @@ def create_grid(data, drone_altitude, safety_distance):
     Returns a grid representation of a 2D configuration space
     based on given obstacle data, drone altitude and safety distance
     arguments.
+
+    Parameters
+    ----------
+    data : 2D numpy array
+    Data parsed from colliders.csv.
+
+    drone_altitude : numeric value (int or float)
+    Height of the drone. Obstacles below this height will be ignored.
+
+    safety_distance : numeric value (int or float)
+    Minimum distance allowed between drone and obstacle.
+
+    Returns
+    -------
+    grid : 2D numpy array
+    2D array of values containing only 1s and 0s, where 1s indicate no-go zones.
+
+    north_min : int
+    Minimum north coordinate.
+
+    east_min : int
+    Minimum east coordinate.
     """
 
     # minimum and maximum north coordinates
@@ -55,6 +77,10 @@ class Action(Enum):
     EAST = (0, 1, 1)
     NORTH = (-1, 0, 1)
     SOUTH = (1, 0, 1)
+    NORTHWEST = (-1, -1, 2**0.5)
+    NORTHEAST = (-1, 1, 2**0.5)
+    SOUTHWEST = (1, -1, 2**0.5)
+    SOUTHEAST = (1, 1, 2**0.5)
 
     @property
     def cost(self):
@@ -65,30 +91,56 @@ class Action(Enum):
         return (self.value[0], self.value[1])
 
 
+def is_valid_node(grid, node):
+    """Returns True if given node is a valid location"""
+    n, m = grid.shape[0] - 1, grid.shape[1] - 1
+    x, y = node
+    if x < 0 or x > n or y < 0 or y > m:
+        return False
+
+    if grid[x, y] == 1:
+        return False
+
+    return True
+
+
 def valid_actions(grid, current_node):
     """
     Returns a list of valid actions given a grid and current node.
     """
-    valid_actions = list(Action)
-    n, m = grid.shape[0] - 1, grid.shape[1] - 1
+    actions = list(Action)
     x, y = current_node
 
     # check if the node is off the grid or
     # it's an obstacle
+    valid_action_lst = []
+    for action in actions:
+        da = action.delta
+        next_node = (x + da[0], y + da[1])
+        if is_valid_node(grid, next_node):
+            valid_action_lst.append(action)
 
-    if x - 1 < 0 or grid[x - 1, y] == 1:
-        valid_actions.remove(Action.NORTH)
-    if x + 1 > n or grid[x + 1, y] == 1:
-        valid_actions.remove(Action.SOUTH)
-    if y - 1 < 0 or grid[x, y - 1] == 1:
-        valid_actions.remove(Action.WEST)
-    if y + 1 > m or grid[x, y + 1] == 1:
-        valid_actions.remove(Action.EAST)
-
-    return valid_actions
+    return valid_action_lst
 
 
 def a_star(grid, h, start, goal):
+    """
+    Returns a path and its associated cost by using A* search.
+
+    Parameters
+    ----------
+    grid : 2D array
+    Grid generated using create_grid function. Points marked 1 represent areas that the drone cannot enter.
+
+    h : function
+    Heuristic function that takes in two coordinates and returns the cost of travelling between them
+
+    start : tuple of 2 elements
+    Start coordinate
+
+    end : tuple of 2 elements
+    End coordinate
+    """
 
     path = []
     path_cost = 0
@@ -120,7 +172,7 @@ def a_star(grid, h, start, goal):
                 queue_cost = branch_cost + h(next_node, goal)
                 
                 if next_node not in visited:                
-                    visited.add(next_node)               
+                    visited.add(next_node)
                     branch[next_node] = (branch_cost, current_node, action)
                     queue.put((queue_cost, next_node))
              
@@ -136,7 +188,8 @@ def a_star(grid, h, start, goal):
     else:
         print('**********************')
         print('Failed to find a path!')
-        print('**********************') 
+        print('**********************')
+        return [], 0
     return path[::-1], path_cost
 
 
