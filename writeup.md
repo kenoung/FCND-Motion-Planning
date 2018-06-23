@@ -45,28 +45,43 @@ disarms and lands.
 #### 1. Set your global home position
 *Here students should read the first line of the csv file, extract lat0 and lon0 as floating point values and use the self.set_home_position() method to set global home. Explain briefly how you accomplished this in your code.*
 
-
+1. Open the file.
+2. Read the first line.
+3. Extract the `lat0` and `lon0` values and convert to float.
+4. Set home position as (`lon0`, `lat0`, 0)
 
 #### 2. Set your current local position
-Here as long as you successfully determine your local position relative to global home you'll be all set. Explain briefly how you accomplished this in your code.
+*Here as long as you successfully determine your local position relative to global home you'll be all set. Explain briefly how you accomplished this in your code.*
 
-
-Meanwhile, here's a picture of me flying through the trees!
-![Forest Flying](./misc/in_the_trees.png)
+Use the `global_to_local` function to convert the global position to the local position relative to the global home.
 
 #### 3. Set grid start position from local position
-This is another step in adding flexibility to the start location. As long as it works you're good to go!
+*This is another step in adding flexibility to the start location. As long as it works you're good to go!*
+
+
 
 #### 4. Set grid goal position from geodetic coords
-This step is to add flexibility to the desired goal location. Should be able to choose any (lat, lon) within the map and have it rendered to a goal location on the grid.
+*This step is to add flexibility to the desired goal location. Should be able to choose any (lat, lon) within the map and have it rendered to a goal location on the grid.*
+
+In order to select a coordinate from map, additional dependencies were used.
+To install these dependencies, run `pip install matplotlib pyproj tilemapbase`.
+Using the `global_to_local` function, we can once again convert (lat, lon) to a local point.
 
 #### 5. Modify A* to include diagonal motion (or replace A* altogether)
-Minimal requirement here is to modify the code in planning_utils() to update the A* implementation to include diagonal motions on the grid that have a cost of sqrt(2), but more creative solutions are welcome. Explain the code you used to accomplish this step.
+*Minimal requirement here is to modify the code in planning_utils() to update the A* implementation to include diagonal motions on the grid that have a cost of sqrt(2), but more creative solutions are welcome. Explain the code you used to accomplish this step.*
 
-#### 6. Cull waypoints 
-For this step you can use a collinearity test or ray tracing method like Bresenham. The idea is simply to prune your path of unnecessary waypoints. Explain the code you used to accomplish this step.
+Four new actions were added to the `Action` Enum in `planning_utils`.
 
+The `valid_actions` function was also refactored to account for new action types.
 
+#### 6. Cull waypoints
+*For this step you can use a collinearity test or ray tracing method like Bresenham. The idea is simply to prune your path of unnecessary waypoints. Explain the code you used to accomplish this step.*
+
+The Bresenham algorithm was used to prune the path. We check if the second
+waypoint can be pruned. If so, we remove it, and repeat the check and
+continue the process until the second waypoint can no longer be pruned
+We then move on to the third waypoint and so on until all the intermediate
+waypoints have been checked.q
 
 ### Execute the flight
 #### 1. Does it work?
